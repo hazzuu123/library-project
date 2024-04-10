@@ -1,12 +1,14 @@
 import express from "express";
 import { Result, body, validationResult } from "express-validator";
+import { StatusCodes } from "http-status-codes";
 
+import conn from "../mysql.js";
 const router = express.Router();
 
 const validate = (req, res, next) => {
   const err = validationResult(req);
   if (!err.isEmpty()) {
-    return res.status(400).json(err.array());
+    return res.status(StatusCodes.BAD_REQUEST).json(err.array());
   }
   return next();
 };
@@ -22,7 +24,18 @@ router.post(
     validate,
   ],
   (req, res) => {
-    res.status(201).json({ message: "회원가입 완료 " });
+    const { email, password } = req.body;
+
+    const sql = `INSERT INTO users (email, password) VALUES (?, ?)`;
+    const values = [email, password];
+    conn.query(sql, values, (err, results) => {
+      if (err) {
+        return res
+          .status(StatusCodes.CONFLICT)
+          .json({ message: "이미 존재하는 계정입니다." });
+      }
+      return res.status(StatusCodes.CREATED).json({ message: "회원가입 완료" });
+    });
   }
 );
 
