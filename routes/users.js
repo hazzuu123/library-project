@@ -2,7 +2,7 @@ import express from "express";
 import { Result, body, validationResult } from "express-validator";
 import { StatusCodes } from "http-status-codes";
 
-import { join } from "../controller/UserController.js";
+import * as user from "../controller/UserController.js";
 
 const router = express.Router();
 
@@ -24,23 +24,15 @@ router.post(
       .withMessage("문자열로 입력해주세요."),
     validate,
   ],
-  join
+  user.join
 );
 
-router.post("/login", (req, res) => {
-  res.status(200).json({ message: "로그인 완료 " });
-});
+router.post("/login", user.login);
 
-router.post("/email", (req, res) => {
-  res.status(200).json({ message: "이메일 확인 완료 " });
-});
+router.post("/email", user.checkEmail);
 
-router.put("/password", (req, res) => {
-  res.status(200).json({ message: "비밀번호 변경 완료 " });
-});
+router.put("/password", user.resetPassword);
 
-router.post("/logout", (req, res) => {
-  res.status(200).json({ message: "로그아웃 완료 " });
-});
+router.post("/logout", user.logout);
 
 export default router;

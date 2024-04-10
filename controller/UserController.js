@@ -16,3 +16,19 @@ export const join = (req, res) => {
     return res.status(StatusCodes.CREATED).json({ message: "회원가입 완료" });
   });
 };
+
+export const login = (req, res) => {
+  res.status(200).json({ message: "로그인 완료 " });
+};
+
+export const checkEmail = (req, res) => {
+  res.status(200).json({ message: "이메일 확인 완료" });
+};
+
+export const resetPassword = (req, res) => {
+  res.status(200).json({ message: "비밀번호 변경 완료 " });
+};
+
+export const logout = (req, res) => {
+  res.status(200).json({ message: "로그아웃 완료 " });
+};
