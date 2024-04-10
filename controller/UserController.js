@@ -1,6 +1,7 @@
 import { StatusCodes } from "http-status-codes";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 import conn from "../mysql.js";
 
@@ -9,13 +10,22 @@ dotenv.config();
 export const join = (req, res) => {
   const { email, password } = req.body;
 
-  const sql = `INSERT INTO users (email, password) VALUES (?, ?)`;
-  const values = [email, password];
+  // 비밀번호 암호화
+  const salt = crypto.randomBytes(64).toString("base64");
+  const hashedPassword = crypto
+    .pbkdf2Sync(password, salt, 10000, 10, "sha512")
+    .toString("base64");
+
+  // 회원가입 시 암호화된 비밀번호, salt 값을 같이 저장
+  // 로그인 시, 이메일&이메일(날 것) ⇒ salt값 꺼내서 비밀번호 암호화 해보고 ⇒ DB 비밀번호랑 비교
+
+  const sql = `INSERT INTO users (email, password, salt) VALUES (?, ?, ?)`;
+  const values = [email, hashedPassword, salt];
   conn.query(sql, values, (err, results) => {
     if (err) {
       return res
         .status(StatusCodes.CONFLICT)
-        .json({ message: "이미 존재하는 계정입니다." });
+        .json({ message: "이미 존재하는 계정입니다.", err });
     }
     return res.status(StatusCodes.CREATED).json({ message: "회원가입 완료" });
   });
@@ -33,7 +43,13 @@ export const login = (req, res) => {
         .json({ message: "DB 오류입니다." });
     }
     const loginUser = results[0];
-    if (!loginUser || loginUser.password !== password) {
+
+    // salt값 꺼내서 비밀번호 암호화 해보고 ⇒ DB 비밀번호랑 비교
+    const hashedPassword = crypto
+      .pbkdf2Sync(password, loginUser.salt, 10000, 10, "sha512")
+      .toString("base64");
+
+    if (!loginUser || loginUser.password !== hashedPassword) {
       return res
         .status(StatusCodes.UNAUTHORIZED)
         .json({ message: "아이디 혹은 비밀번호가 틀렸습니다." });
@@ -77,8 +93,14 @@ export const checkEmail = (req, res) => {
 export const resetPassword = (req, res) => {
   const { email, password } = req.body;
 
-  const sql = `UPDATE users SET password = ? WHERE email = ?`;
-  const values = [password, email];
+  // 비밀번호 암호화
+  const salt = crypto.randomBytes(64).toString("base64");
+  const hashedPassword = crypto
+    .pbkdf2Sync(password, salt, 10000, 10, "sha512")
+    .toString("base64");
+
+  const sql = `UPDATE users SET password = ?, salt = ? WHERE email = ?`;
+  const values = [hashedPassword, salt, email];
   conn.query(sql, values, (err, results) => {
     if (err) {
       return res
