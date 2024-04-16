@@ -7,6 +7,7 @@ import BookRouter from "./routes/books.js";
 import LikeRouter from "./routes/likes.js";
 import CartRouter from "./routes/carts.js";
 import OrderRouter from "./routes/orders.js";
+import CategoryRouter from "./routes/category.js";
 
 dotenv.config();
 
@@ -19,5 +20,6 @@ app.use("/books", BookRouter);
 app.use("/likes", LikeRouter);
 app.use("/carts", CartRouter);
 app.use("/orders", OrderRouter);
+app.use("/category", CategoryRouter);
 
 app.listen(process.env.PORT);
