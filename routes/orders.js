@@ -1,17 +1,11 @@
 import express from "express";
-
+import * as order from "../controller/OrderController.js";
 const router = express.Router();
 
-router.post("/", (req, res) => {
-  res.status(201).json({ message: "주문하기 " });
-});
+router.post("/", order.order);
 
-router.get("/", (req, res) => {
-  res.status(200).json({ message: "주문 목록 조회" });
-});
+router.get("/", order.getOrders);
 
-router.get("/:id", (req, res) => {
-  res.status(200).json({ message: "주문 상세 상품 조회 " });
-});
+router.get("/:id", order.getOrderDetail);
 
 export default router;
