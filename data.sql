@@ -48,17 +48,18 @@ INSERT INTO likes (user_id, liked_book_id) VALUES (2, 2);
 INSERT INTO likes (user_id, liked_book_id) VALUES (2, 3);
 INSERT INTO likes (user_id, liked_book_id) VALUES (2, 5);
 
-
+ 
 // 좋아요 삭제
 DELETE FROM likes WHERE user_id = 1 AND liked_book_id = 3;
 
 // 장바구니 담기
-INSERT INTO cartItems (book_id, quantity, user_id) VALUES (1, 1, 1);
+INSERT INTO cart_items (book_id, quantity, user_id) VALUES (1, 1, 1); 
 
 // 장바구니 아이템 목록 조회
-SELECT cartItems.id, book_id, title, summary, quantity, price 
-FROM cartItems LEFT JOIN books 
-ON cartItems.book_id = books.id;
+SELECT cart_items.id, book_id, title, summary, quantity, price  FROM cart_items
+LEFT JOIN books
+ON book_id = books.id
+WHERE user_id = 1;
 
 // 장바구니 아이템 조회
 DELETE FROM cartItems WHERE id = ?;
