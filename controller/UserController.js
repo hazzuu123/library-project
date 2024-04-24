@@ -25,9 +25,13 @@ export const join = (req, res) => {
     if (err) {
       return res
         .status(StatusCodes.CONFLICT)
-        .json({ message: "이미 존재하는 계정입니다.", err });
+        .json({ message: "이미 존재하는 계정입니다." });
     }
-    return res.status(StatusCodes.CREATED).json({ message: "회원가입 완료" });
+    if (results.affectedRows) {
+      return res.status(StatusCodes.CREATED).json({ message: "회원가입 완료" });
+    } else {
+      return res.status(StatusCodes.BAD_REQUEST).end();
+    }
   });
 };
 
@@ -58,7 +62,7 @@ export const login = (req, res) => {
     const token = jwt.sign(
       { id: loginUser.id, email: loginUser.email },
       process.env.PRIVATE_KEY,
-      { expiresIn: "5m", issuer: "juyeong" }
+      { expiresIn: "10m", issuer: "juyeong" }
     );
 
     res.cookie("token", token, { httpOnly: true });

@@ -1,14 +1,16 @@
 import { StatusCodes } from "http-status-codes";
+import jwt from "jsonwebtoken";
 
 import conn from "../mysql.js";
-// 하주영
+import ensureAuthorization from "../auth.js";
+
 export const getBooks = (req, res) => {
+  let allBooksResponse = {};
   let { categoryId, isLatest, perPage, page } = req.query;
 
   categoryId = +categoryId;
   perPage = +perPage;
   page = +page;
-  isLatest = JSON.parse(isLatest);
 
   // perPage: page 당 도서 수
   // page: 현재 페이지
@@ -16,7 +18,7 @@ export const getBooks = (req, res) => {
   let offset = perPage * (page - 1);
 
   let sql =
-    "SELECT *, (SELECT count(*) FROM likes WHERE book_id = books.id) as likes FROM books";
+    "SELECT SQL_CALC_FOUND_ROWS *, (SELECT count(*) FROM likes WHERE book_id = books.id) as likes FROM books";
   let value = [];
 
   if (!isNaN(categoryId)) {
@@ -24,9 +26,9 @@ export const getBooks = (req, res) => {
     value.push(categoryId);
   }
 
-  if (isLatest && !isNaN(categoryId)) {
+  if (isLatest === "true" && !isNaN(categoryId)) {
     sql += " AND pub_date BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()";
-  } else if (isLatest) {
+  } else if (isLatest === "true") {
     sql +=
       " WHERE pub_date BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()";
   }
@@ -41,23 +43,63 @@ export const getBooks = (req, res) => {
         .json({ message: "DB 오류", err });
     }
 
-    if (results.length) {
-      return res.status(StatusCodes.OK).json(results);
-    } else {
+    if (!results.length) {
       return res.status(StatusCodes.NOT_FOUND).end();
     }
+
+    results.map((book) => {
+      book.pubDate = book.pub_date;
+      delete book.pub_date;
+    });
+
+    allBooksResponse.books = results;
+
+    sql = "SELECT found_rows() AS totalCount";
+    conn.query(sql, value, (err, results) => {
+      if (err) {
+        return res
+          .status(StatusCodes.INTERNAL_SERVER_ERROR)
+          .json({ message: "DB 오류", err });
+      }
+
+      let pagination = {
+        page,
+        totalCount: results[0].totalCount,
+      };
+
+      allBooksResponse.pagination = pagination;
+
+      return res.status(StatusCodes.OK).json(allBooksResponse);
+    });
   });
 };
 
 // 개별 도서 조회
 export const getBook = (req, res) => {
   let { bookId } = req.params;
-  let { userId } = req.body;
+  let hasToken = true; // 토큰 포함 여부 -> is_liked를 포함할 지 말지 결정하는 변수
+  const authorization = ensureAuthorization(req, res);
 
-  bookId = Number(bookId);
-  userId = Number(userId);
+  if (authorization instanceof jwt.TokenExpiredError) {
+    return res
+      .status(StatusCodes.UNAUTHORIZED)
+      .json({ message: "로그인 세션이 만료되었습니다. 다시 로그인 하세요." });
+  } else if (authorization instanceof jwt.JsonWebTokenError) {
+    // Authorization이 비었을 때,
+    if (authorization.message === "jwt must be provided") {
+      hasToken = false;
+    } else {
+      return res
+        .status(StatusCodes.BAD_REQUEST)
+        .json({ message: "잘못된 토큰입니다." });
+    }
+  }
 
-  const sql = `SELECT *, 
+  // TODO: 토큰 가지고 있을 때와 없을 때, 리팩토링하기
+  let sql;
+  let values;
+  if (hasToken) {
+    sql = `SELECT *, 
     (SELECT count(*) FROM likes WHERE book_id = books.id) as likes,  
     (SELECT EXISTS (SELECT * FROM likes WHERE user_id = ? AND book_id = ?)) as is_liked 
     FROM books 
@@ -65,8 +107,19 @@ export const getBook = (req, res) => {
     ON books.category_id = category.category_id 
     WHERE books.id = ?
   `;
-  const value = [userId, bookId, bookId];
-  conn.query(sql, value, (err, results) => {
+    values = [authorization.id, bookId, bookId];
+  } else {
+    sql = `SELECT *, 
+    (SELECT count(*) FROM likes WHERE book_id = books.id) as likes
+    FROM books 
+    LEFT JOIN category 
+    ON books.category_id = category.category_id 
+    WHERE books.id = ?
+  `;
+    values = [bookId];
+  }
+
+  conn.query(sql, values, (err, results) => {
     if (err) {
       return res
         .status(StatusCodes.INTERNAL_SERVER_ERROR)

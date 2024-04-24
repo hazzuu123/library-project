@@ -1,17 +1,27 @@
 import { StatusCodes } from "http-status-codes";
+import jwt from "jsonwebtoken";
 
 import conn from "../mysql.js";
+import ensureAuthorization from "../auth.js";
 
 export const addCartItem = (req, res) => {
-  let { userId, bookId, quantity } = req.body;
+  let { bookId, quantity } = req.body;
 
-  userId = Number(userId);
-  bookId = Number(bookId);
-  quantity = Number(quantity);
+  const authorization = ensureAuthorization(req, res);
+
+  if (authorization instanceof jwt.TokenExpiredError) {
+    return res
+      .status(StatusCodes.UNAUTHORIZED)
+      .json({ message: "로그인 세션이 만료되었습니다. 다시 로그인 하세요." });
+  } else if (authorization instanceof jwt.JsonWebTokenError) {
+    return res
+      .status(StatusCodes.BAD_REQUEST)
+      .json({ message: "잘못된 토큰입니다." });
+  }
 
   const sql = `INSERT INTO cart_items (book_id, quantity, user_id) VALUES (?, ?, ?); 
   `;
-  const values = [bookId, quantity, userId];
+  const values = [bookId, quantity, authorization.id];
   conn.query(sql, values, (err, results) => {
     if (err) {
       return res
@@ -24,16 +34,32 @@ export const addCartItem = (req, res) => {
 };
 
 export const getCartItems = (req, res) => {
-  let { userId, selected } = req.body;
+  let { selected } = req.body;
 
-  userId = Number(userId);
+  const authorization = ensureAuthorization(req, res);
 
-  const sql = `SELECT cart_items.id, book_id, title, summary, quantity, price  FROM cart_items
+  if (authorization instanceof jwt.TokenExpiredError) {
+    // 토큰이 만료된 경우
+    return res
+      .status(StatusCodes.UNAUTHORIZED)
+      .json({ message: "로그인 세션이 만료되었습니다. 다시 로그인 하세요." });
+  } else if (authorization instanceof jwt.JsonWebTokenError) {
+    // 토큰이 없거나 잘못된 경우
+    return res
+      .status(StatusCodes.BAD_REQUEST)
+      .json({ message: "잘못된 토큰입니다." });
+  }
+
+  let sql = `SELECT cart_items.id, book_id, title, summary, quantity, price  FROM cart_items
     LEFT JOIN books
     ON book_id = books.id
-    WHERE user_id = ? AND cart_items.id IN (?)`;
+    WHERE user_id = ?`;
+  const values = [authorization.id];
 
-  const values = [userId, selected];
+  if (selected.length) {
+    sql += ` AND cart_items.id IN (?)`;
+    values.push(selected);
+  }
 
   conn.query(sql, values, (err, results) => {
     if (err) {
@@ -52,11 +78,25 @@ export const getCartItems = (req, res) => {
   });
 };
 
-export const removeCartIem = (req, res) => {
-  const { id } = req.params;
+export const removeCartItem = (req, res) => {
+  const { id: cartItemId } = req.params;
+
+  const authorization = ensureAuthorization(req, res);
+
+  if (authorization instanceof jwt.TokenExpiredError) {
+    // 토큰이 만료된 경우
+    return res
+      .status(StatusCodes.UNAUTHORIZED)
+      .json({ message: "로그인 세션이 만료되었습니다. 다시 로그인 하세요." });
+  } else if (authorization instanceof jwt.JsonWebTokenError) {
+    // 토큰이 없거나 잘못된 경우
+    return res
+      .status(StatusCodes.BAD_REQUEST)
+      .json({ message: "잘못된 토큰입니다." });
+  }
 
   const sql = `DELETE FROM cart_items WHERE id = ?;`;
-  const values = [id];
+  const values = [cartItemId];
 
   conn.query(sql, values, (err, results) => {
     if (err) {

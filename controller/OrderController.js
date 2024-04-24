@@ -1,11 +1,26 @@
 // 하주영
 import { StatusCodes } from "http-status-codes";
+import jwt from "jsonwebtoken";
 
 import conn from "../mysql_promise.js";
+import ensureAuthorization from "../auth.js";
 
 export const order = async (req, res) => {
-  let { items, delivery, totalQuantity, totalPrice, userId, firstBookTitle } =
-    req.body;
+  let { items, delivery, totalQuantity, totalPrice, firstBookTitle } = req.body;
+
+  const authorization = ensureAuthorization(req, res);
+
+  if (authorization instanceof jwt.TokenExpiredError) {
+    // 토큰이 만료된 경우
+    return res
+      .status(StatusCodes.UNAUTHORIZED)
+      .json({ message: "로그인 세션이 만료되었습니다. 다시 로그인 하세요." });
+  } else if (authorization instanceof jwt.JsonWebTokenError) {
+    // 토큰이 없거나 잘못된 경우
+    return res
+      .status(StatusCodes.BAD_REQUEST)
+      .json({ message: "잘못된 토큰입니다." });
+  }
 
   let deliveryId;
   let orderId;
@@ -29,7 +44,13 @@ export const order = async (req, res) => {
   try {
     sql = `INSERT INTO orders (book_title, total_quantity, total_price, user_id, delivery_id)
     VALUES (?, ?, ?, ?, ?)`;
-    values = [firstBookTitle, totalQuantity, totalPrice, userId, deliveryId];
+    values = [
+      firstBookTitle,
+      totalQuantity,
+      totalPrice,
+      authorization.id,
+      deliveryId,
+    ];
 
     const [results] = await conn.execute(sql, values);
 
@@ -83,23 +104,28 @@ export const order = async (req, res) => {
   }
 };
 
-const _deleteCartItems = async (items) => {
-  const sql = `DELETE FROM cart_items WHERE id IN (?)`;
-  let values = items;
-
-  const [results] = await conn.query(sql, [values]);
-  return results;
-};
-
 export const getOrders = async (req, res) => {
-  const { userId } = req.body;
+  const authorization = ensureAuthorization(req, res);
+
+  if (authorization instanceof jwt.TokenExpiredError) {
+    // 토큰이 만료된 경우
+    return res
+      .status(StatusCodes.UNAUTHORIZED)
+      .json({ message: "로그인 세션이 만료되었습니다. 다시 로그인 하세요." });
+  } else if (authorization instanceof jwt.JsonWebTokenError) {
+    // 토큰이 없거나 잘못된 경우
+    return res
+      .status(StatusCodes.BAD_REQUEST)
+      .json({ message: "잘못된 토큰입니다." });
+  }
+
   try {
     const sql = `SELECT orders.id, created_at,address,receiver, contact , book_title, total_price,total_quantity
       FROM orders
       LEFT JOIN delivery
       ON orders.delivery_id = delivery.id
       WHERE user_id = ?`;
-    const values = [userId];
+    const values = [authorization.id];
     const [results] = await conn.execute(sql, values);
 
     if (results.length > 0) {
@@ -110,13 +136,27 @@ export const getOrders = async (req, res) => {
   } catch (err) {
     res
       .status(err.status || StatusCodes.INTERNAL_SERVER_ERROR)
-      .json({ message: err.errMessage || "DB 오류" });
+      .json({ message: err.errMessage || "DB 오류", err });
   }
 };
 
-// TODO : 주문 상세 조회에 user_id값을 받기.
 export const getOrderDetail = async (req, res) => {
   const { id: orderId } = req.params;
+
+  const authorization = ensureAuthorization(req, res);
+
+  if (authorization instanceof jwt.TokenExpiredError) {
+    // 토큰이 만료된 경우
+    return res
+      .status(StatusCodes.UNAUTHORIZED)
+      .json({ message: "로그인 세션이 만료되었습니다. 다시 로그인 하세요." });
+  } else if (authorization instanceof jwt.JsonWebTokenError) {
+    // 토큰이 없거나 잘못된 경우
+    return res
+      .status(StatusCodes.BAD_REQUEST)
+      .json({ message: "잘못된 토큰입니다." });
+  }
+
   try {
     const sql = `SELECT book_id, title, author, price, quantity
       FROM ordered_book
@@ -136,4 +176,12 @@ export const getOrderDetail = async (req, res) => {
       .status(err.status || StatusCodes.INTERNAL_SERVER_ERROR)
       .json({ message: err.errMessage || "DB 오류" });
   }
+};
+
+const _deleteCartItems = async (items) => {
+  const sql = `DELETE FROM cart_items WHERE id IN (?)`;
+  let values = items;
+
+  const [results] = await conn.query(sql, [values]);
+  return results;
 };
