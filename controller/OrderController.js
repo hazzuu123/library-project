@@ -4,22 +4,20 @@ import jwt from "jsonwebtoken";
 
 import conn from "../mysql_promise.js";
 import ensureAuthorization from "../auth.js";
+import * as errorList from "../customError.js";
 
-export const order = async (req, res) => {
+export const order = async (req, res, next) => {
   let { items, delivery, totalQuantity, totalPrice, firstBookTitle } = req.body;
 
   const authorization = ensureAuthorization(req, res);
 
   if (authorization instanceof jwt.TokenExpiredError) {
-    // 토큰이 만료된 경우
-    return res
-      .status(StatusCodes.UNAUTHORIZED)
-      .json({ message: "로그인 세션이 만료되었습니다. 다시 로그인 하세요." });
+    const error = errorList.createUnauthrorizedError("토큰이 만료되었습니다.");
+    next(error);
   } else if (authorization instanceof jwt.JsonWebTokenError) {
-    // 토큰이 없거나 잘못된 경우
-    return res
-      .status(StatusCodes.BAD_REQUEST)
-      .json({ message: "잘못된 토큰입니다." });
+    const error =
+      errorList.createUnauthrorizedError("토큰이 없거나 잘못되었습니다.");
+    next(error);
   }
 
   let deliveryId;
@@ -35,7 +33,7 @@ export const order = async (req, res) => {
     const [results] = await conn.execute(sql, values);
     deliveryId = results.insertId;
   } catch (err) {
-    res
+    return res
       .status(StatusCodes.INTERNAL_SERVER_ERROR)
       .json({ message: "DB 오류", err });
   }
@@ -72,7 +70,7 @@ export const order = async (req, res) => {
 
     orderItems = results;
   } catch (err) {
-    res
+    return res
       .status(StatusCodes.INTERNAL_SERVER_ERROR)
       .json({ message: "DB 오류", err });
   }
@@ -88,7 +86,7 @@ export const order = async (req, res) => {
 
     const [results] = await conn.query(sql, [values]); // execute 사용하면 에러발생
   } catch (err) {
-    res
+    return res
       .status(StatusCodes.INTERNAL_SERVER_ERROR)
       .json({ message: "ordered_book INSERT 오류", err });
   }
@@ -96,7 +94,7 @@ export const order = async (req, res) => {
   // 장바구니에서 DELETE
   try {
     const results = await _deleteCartItems(items);
-    res.status(StatusCodes.CREATED).json({ results });
+    return res.status(StatusCodes.CREATED).json({ results });
   } catch (err) {
     res
       .status(StatusCodes.INTERNAL_SERVER_ERROR)
@@ -104,21 +102,17 @@ export const order = async (req, res) => {
   }
 };
 
-export const getOrders = async (req, res) => {
+export const getOrders = async (req, res, next) => {
   const authorization = ensureAuthorization(req, res);
 
   if (authorization instanceof jwt.TokenExpiredError) {
-    // 토큰이 만료된 경우
-    return res
-      .status(StatusCodes.UNAUTHORIZED)
-      .json({ message: "로그인 세션이 만료되었습니다. 다시 로그인 하세요." });
+    const error = errorList.createUnauthrorizedError("토큰이 만료되었습니다.");
+    next(error);
   } else if (authorization instanceof jwt.JsonWebTokenError) {
-    // 토큰이 없거나 잘못된 경우
-    return res
-      .status(StatusCodes.BAD_REQUEST)
-      .json({ message: "잘못된 토큰입니다." });
+    const error =
+      errorList.createUnauthrorizedError("토큰이 없거나 잘못되었습니다.");
+    next(error);
   }
-
   try {
     const sql = `SELECT orders.id, created_at,address,receiver, contact , book_title, total_price,total_quantity
       FROM orders
@@ -130,34 +124,31 @@ export const getOrders = async (req, res) => {
 
     if (results.length > 0) {
       return res.status(StatusCodes.OK).json(results);
+    } else {
+      const error = errorList.createNotFoundError("텅 비었습니다.");
+      next(error);
     }
-
-    throw { status: StatusCodes.NOT_FOUND, errMessage: "텅 비었습니다." };
   } catch (err) {
-    res
-      .status(err.status || StatusCodes.INTERNAL_SERVER_ERROR)
-      .json({ message: err.errMessage || "DB 오류", err });
+    next(err);
   }
 };
 
-export const getOrderDetail = async (req, res) => {
-  const { id: orderId } = req.params;
-
-  const authorization = ensureAuthorization(req, res);
-
-  if (authorization instanceof jwt.TokenExpiredError) {
-    // 토큰이 만료된 경우
-    return res
-      .status(StatusCodes.UNAUTHORIZED)
-      .json({ message: "로그인 세션이 만료되었습니다. 다시 로그인 하세요." });
-  } else if (authorization instanceof jwt.JsonWebTokenError) {
-    // 토큰이 없거나 잘못된 경우
-    return res
-      .status(StatusCodes.BAD_REQUEST)
-      .json({ message: "잘못된 토큰입니다." });
-  }
-
+export const getOrderDetail = async (req, res, next) => {
   try {
+    const { id: orderId } = req.params;
+
+    const authorization = ensureAuthorization(req, res);
+
+    if (authorization instanceof jwt.TokenExpiredError) {
+      const error =
+        errorList.createUnauthrorizedError("토큰이 만료되었습니다.");
+      next(error);
+    } else if (authorization instanceof jwt.JsonWebTokenError) {
+      const error =
+        errorList.createUnauthrorizedError("토큰이 없거나 잘못되었습니다.");
+      next(error);
+    }
+
     const sql = `SELECT book_id, title, author, price, quantity
       FROM ordered_book
       LEFT JOIN books
@@ -166,15 +157,19 @@ export const getOrderDetail = async (req, res) => {
     const values = [orderId];
     const [results] = await conn.query(sql, values);
 
+    results.map((book) => {
+      book.bookId = book.book_id;
+      delete book.book_id;
+    });
+
     if (results.length > 0) {
       return res.status(StatusCodes.OK).json(results);
+    } else {
+      const error = errorList.createNotFoundError("텅 비었습니다.");
+      next(error);
     }
-
-    throw { status: StatusCodes.NOT_FOUND, errMessage: "텅 비었습니다." };
   } catch (err) {
-    res
-      .status(err.status || StatusCodes.INTERNAL_SERVER_ERROR)
-      .json({ message: err.errMessage || "DB 오류" });
+    next(err);
   }
 };
 
