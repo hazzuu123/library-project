@@ -1,7 +1,7 @@
 import { StatusCodes } from "http-status-codes";
 import jwt from "jsonwebtoken";
 
-import conn from "../mysql_promise.js";
+import conn from "../mysql.js";
 import ensureAuthorization from "../auth.js";
 import * as errorList from "../customError.js";
 

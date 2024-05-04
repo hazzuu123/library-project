@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
-import conn from "../mysql_promise.js";
+import conn from "../mysql.js";
 import * as errorList from "../customError.js";
 
 dotenv.config();
