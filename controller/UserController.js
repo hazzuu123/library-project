@@ -8,14 +8,20 @@ import * as errorList from "../customError.js";
 
 dotenv.config();
 
+const _hashed = (password, salt) => {
+  const hashedPassword = crypto
+    .pbkdf2Sync(password, salt, 10000, 10, "sha512")
+    .toString("base64");
+
+  return hashedPassword;
+};
+
 export const join = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
     const salt = crypto.randomBytes(64).toString("base64");
-    const hashedPassword = crypto
-      .pbkdf2Sync(password, salt, 10000, 10, "sha512")
-      .toString("base64");
+    const hashedPassword = _hashed(password, salt);
 
     const sql = `INSERT INTO users (email, password, salt) VALUES (?, ?, ?)`;
     const values = [email, hashedPassword, salt];
@@ -53,9 +59,7 @@ export const login = async (req, res, next) => {
     }
 
     // salt값 꺼내서 비밀번호 암호화 해보고 ⇒ DB 비밀번호랑 비교
-    const hashedPassword = crypto
-      .pbkdf2Sync(password, loginUser.salt, 10000, 10, "sha512")
-      .toString("base64");
+    const hashedPassword = _hashed(password, loginUser.salt);
 
     if (loginUser.password !== hashedPassword) {
       const error =
@@ -107,9 +111,7 @@ export const resetPassword = async (req, res, next) => {
 
     // 비밀번호 암호화
     const salt = crypto.randomBytes(64).toString("base64");
-    const hashedPassword = crypto
-      .pbkdf2Sync(password, salt, 10000, 10, "sha512")
-      .toString("base64");
+    const hashedPassword = _hashed(password, salt);
 
     const sql = `UPDATE users SET password = ?, salt = ? WHERE email = ?`;
     const values = [hashedPassword, salt, email];
