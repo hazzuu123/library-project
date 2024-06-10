@@ -122,6 +122,17 @@ export const getOrders = async (req, res, next) => {
     const values = [authorization.id];
     const [results] = await conn.execute(sql, values);
 
+    results.map((order) => {
+      order.createdAt = order.created_at;
+      order.bookTitle = order.book_title;
+      order.totalQuantity = order.total_quantity;
+      order.totalPrice = order.total_price;
+      delete order.created_at;
+      delete order.book_title;
+      delete order.total_quantity;
+      delete order.total_price;
+    });
+
     if (results.length > 0) {
       return res.status(StatusCodes.OK).json(results);
     } else {

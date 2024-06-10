@@ -9,6 +9,13 @@ export const getCategory = async (req, res) => {
 
     const [results] = await conn.execute(sql);
 
+    results.map((category) => {
+      category.id = category.category_id;
+      category.name = category.category_name;
+      delete category.category_id;
+      delete category.category_name;
+    });
+
     if (results.length) {
       return res.status(StatusCodes.OK).json(results);
     } else {

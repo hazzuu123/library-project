@@ -45,7 +45,9 @@ export const getBooks = async (req, res, next) => {
 
     results.map((book) => {
       book.pubDate = book.pub_date;
+      book.categoryId = book.category_id;
       delete book.pub_date;
+      delete book.category_id;
     });
 
     allBooksResponse.books = results;
@@ -104,6 +106,17 @@ export const getBook = async (req, res, next) => {
     }
 
     const [results] = await conn.query(sql, values);
+
+    results.map((book) => {
+      book.pubDate = book.pub_date;
+      book.categoryId = book.category_id;
+      book.categoryName = book.category_name;
+      book.isLiked = book.is_liked;
+      delete book.pub_date;
+      delete book.category_id;
+      delete book.category_name;
+      delete book.is_liked;
+    });
 
     if (results[0]) {
       return res.status(StatusCodes.OK).json(results[0]);

@@ -59,12 +59,17 @@ export const getCartItems = async (req, res, next) => {
     WHERE user_id = ?`;
     const values = [authorization.id];
 
-    if (selected.length) {
+    if (selected) {
       sql += ` AND cart_items.id IN (?)`;
       values.push(selected);
     }
 
     const [results] = await conn.query(sql, values);
+
+    results.map((cartItem) => {
+      cartItem.bookId = cartItem.book_id;
+      delete cartItem.book_id;
+    });
 
     if (results.length) {
       return res.status(StatusCodes.OK).json(results);

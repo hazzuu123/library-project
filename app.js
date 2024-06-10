@@ -1,7 +1,7 @@
 // 2기 하주영
 import express from "express";
 import dotenv from "dotenv";
-import jwt from "jsonwebtoken";
+import cors from "cors";
 
 import UserRouter from "./routes/users.js";
 import BookRouter from "./routes/books.js";
@@ -13,6 +13,13 @@ import CategoryRouter from "./routes/category.js";
 dotenv.config();
 
 const app = express();
+
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  })
+);
 
 app.use(express.json());
 

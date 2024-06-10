@@ -76,7 +76,7 @@ export const login = async (req, res, next) => {
 
     res.cookie("token", token, { httpOnly: true });
 
-    return res.status(StatusCodes.OK).json({ message: "로그인 완료" });
+    return res.status(StatusCodes.OK).json({ message: "로그인 완료", token });
   } catch (err) {
     console.log(1);
     next(err);
